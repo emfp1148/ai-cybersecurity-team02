@@ -50,8 +50,6 @@ def run_semgrep_scan(target_path: str, config_path: str) -> dict:
             
         try:
             scan_result = json.loads(result.stdout)
-            findings_count = len(scan_result.get("results", []))
-            print(f"스캔 완료: {findings_count}개의 취약점 발견")
             return scan_result
         except json.JSONDecodeError:
             print("스캔 결과 없음")
@@ -433,3 +431,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

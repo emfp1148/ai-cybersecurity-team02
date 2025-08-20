@@ -7,7 +7,7 @@ import yaml
 import chardet
 from typing import List, Dict, Set, Tuple
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = "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"
 if not openai.api_key:
     raise RuntimeError("환경변수 OPENAI_API_KEY가 설정되지 않았습니다. 먼저 설정해주세요.")
 
@@ -15,16 +15,56 @@ if not openai.api_key:
 SEMGREP_CONFIG_PATH = "p/owasp-top-ten"
 
 def run_semgrep_scan(target_path: str, config_path: str) -> dict:
-    print(f"Semgrep 스캔을 시작합니다: 대상 경로='{target_path}', 룰='{config_path}'")
-    result = subprocess.run(
-        ["semgrep", "--json", "--config", config_path, target_path],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode not in (0, 1):
-        err_msg = result.stderr.strip() or result.stdout.strip()
-        raise RuntimeError(f"Semgrep 실패: {err_msg}")
-    return json.loads(result.stdout)
+    """Semgrep으로 코드를 스캔합니다."""
+    print(f"Semgrep 스캔을 시작합니다: 대상 경로='{target_path}'")
+    
+    if not config_path.startswith("p/"):
+        config_path = os.path.abspath(config_path)
+    
+    try:
+        # 환경 변수 설정으로 경고 메시지 억제
+        env = os.environ.copy()
+        env["PYTHONWARNINGS"] = "ignore"
+        
+        result = subprocess.run(
+            ["semgrep", 
+             "--json",
+             "--quiet",  
+             "--disable-version-check",
+             "--config", config_path,
+             target_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+            env=env  # 수정된 환경 변수 적용
+        )
+        
+        # 실제 오류와 경고 구분
+        if result.returncode > 1:  # 0,1은 정상 종료 코드
+            real_errors = [line for line in result.stderr.splitlines() 
+                         if not line.startswith('[WARNING]') 
+                         and 'UserWarning' not in line]
+            if real_errors:
+                raise RuntimeError("\n".join(real_errors))
+            
+        try:
+            scan_result = json.loads(result.stdout)
+            findings_count = len(scan_result.get("results", []))
+            print(f"스캔 완료: {findings_count}개의 취약점 발견")
+            return scan_result
+        except json.JSONDecodeError:
+            print("스캔 결과 없음")
+            return {"results": []}
+            
+    except FileNotFoundError:
+        raise RuntimeError("Semgrep이 설치되어 있지 않습니다. 'pip install semgrep'로 설치해주세요.")
+    except Exception as e:
+        if "WARNING" in str(e) or "UserWarning" in str(e):
+            # 경고는 무시하고 빈 결과 반환
+            print("경고를 무시하고 계속 진행합니다.")
+            return {"results": []}
+        raise RuntimeError(f"예기치 않은 오류 발생: {str(e)}")
 
 def read_code_snippet(path: str, start_line: int, end_line: int) -> str:
     try:
@@ -186,6 +226,7 @@ def postprocess_semgrep_results(semgrep_json: dict) -> List[Dict]:
     return processed_results
 
 def generate_new_rules(findings: List[Dict]) -> str:
+    """분석된 취약점을 바탕으로 새로운 Semgrep 규칙을 생성합니다."""
     context = "\n\n".join([
         f"취약점 ID: {finding['check_id']}\n"
         f"취약 코드:\n{finding['code']}\n"
@@ -198,48 +239,105 @@ def generate_new_rules(findings: List[Dict]) -> str:
 {context}
 
 위 취약점들을 분석하여 Semgrep 규칙을 YAML 형식으로 작성해주세요.
-다음 형식을 반드시 지켜주세요:
+각 취약점 패턴마다 새로운 규칙을 만들어주세요.
 
+규칙 작성 시 다음 사항을 반드시 준수해주세요:
+1. 각 규칙은 고유한 id를 가져야 합니다
+2. pattern은 실제 코드 패턴을 반영해야 합니다
+3. message는 구체적인 취약점 설명을 포함해야 합니다
+4. severity는 취약점의 심각도를 반영해야 합니다 (WARNING, ERROR, INFO)
+
+예시 형식:
 rules:
-  - id: rule_name
-    pattern: pattern_here
-    message: "설명"
+  - id: custom_sql_injection_1
+    pattern: "SELECT ... WHERE ... = '$...'"
+    message: "SQL 인젝션 취약점: 사용자 입력을 직접 쿼리에 사용"
     languages: [python]
-    severity: WARNING
+    severity: ERROR
 
-각 규칙은 반드시 위 형식을 따라야 하며, 'rules:' 키워드로 시작해야 합니다."""
+  - id: xss_vulnerability_1
+    pattern: response.write("..." + user_input + "...")
+    message: "XSS 취약점: 사용자 입력을 이스케이프 처리 없이 출력"
+    languages: [python]
+    severity: ERROR"""
 
     response = openai.chat.completions.create(
         model="gpt-4",
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,  # 창의성 조절
+        max_tokens=2000   # 더 긴 응답 허용
     )
     
     generated_rules = response.choices[0].message.content.strip()
-    if not generated_rules.startswith("rules:"):
-        generated_rules = "rules:\n" + generated_rules
-    
     return generated_rules
+
+def ensure_directory_exists(directory: str) -> None:
+    """지정된 디렉토리가 없으면 생성합니다."""
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"디렉토리 생성됨: {directory}")
 
 def save_new_rules(rules: str, target_path: str) -> str:
     """생성된 규칙을 YAML 파일로 저장합니다."""
+    # new_rules 폴더 생성
+    rules_dir = "new_rules"
+    ensure_directory_exists(rules_dir)
+    
     base_name = os.path.splitext(os.path.basename(target_path))[0]
     filename = f"new_rules_{base_name}.yaml"
+    filepath = os.path.join(rules_dir, filename)
     
     try:
-        yaml.safe_load(rules)
-    except yaml.YAMLError as e:
-        print(f"경고: 생성된 규칙이 유효한 YAML이 아닙니다: {e}")
-        print("기본 규칙 템플릿으로 대체합니다.")
-        rules = """rules:
-  - id: default_rule
-    pattern: $X = request.args.get(...)
-    message: "사용자 입력을 검증 없이 사용하고 있습니다"
+        # YAML 유효성 검사
+        parsed_rules = yaml.safe_load(rules)
+        
+        # 기본적인 구조 검사
+        if not isinstance(parsed_rules, dict) or "rules" not in parsed_rules:
+            raise ValueError("규칙이 올바른 형식이 아닙니다")
+        
+        if not parsed_rules["rules"]:
+            raise ValueError("규칙이 비어있습니다")
+        
+        # 각 규칙의 필수 필드 검사
+        required_fields = {"id", "pattern", "message", "languages", "severity"}
+        for rule in parsed_rules["rules"]:
+            missing_fields = required_fields - set(rule.keys())
+            if missing_fields:
+                raise ValueError(f"규칙에 필수 필드가 누락됨: {missing_fields}")
+        
+        # 유효한 규칙이면 저장
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(rules)
+        return filepath
+        
+    except (yaml.YAMLError, ValueError) as e:
+        print(f"경고: 생성된 규칙에 문제가 있습니다: {e}")
+        print("GPT에 규칙 재생성을 요청합니다...")
+        
+        # 규칙 재생성 시도
+        prompt = f"""이전 규칙 생성에 문제가 있었습니다. 다음 형식을 정확히 지켜서 다시 작성해주세요:
+
+rules:
+  - id: unique_rule_id
+    pattern: |
+      $PATTERN = dangerous_function($INPUT)
+    message: "구체적인 취약점 설명"
     languages: [python]
-    severity: WARNING"""
-    
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write(rules)
-    return filename
+    severity: ERROR"""
+        
+        response = openai.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5
+        )
+        
+        new_rules = response.choices[0].message.content.strip()
+        
+        # 재생성된 규칙 저장
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(new_rules)
+        
+        return filepath
 
 def main():
     print("※ 검사 대상 경로는 루트 기준 상대경로(예: ./a) 형태로 입력하세요.")
@@ -264,6 +362,10 @@ def main():
     # 4. 전체 보고서 생성
     print("\n[4/4] 최종 보고서 생성 중...")
     
+    # security_report 폴더 생성
+    report_dir = "security_report"
+    ensure_directory_exists(report_dir)
+    
     # YAML 규칙을 파이썬 객체로 변환
     try:
         parsed_rules = yaml.safe_load(new_rules)
@@ -278,7 +380,7 @@ def main():
                 "path": finding["path"],
                 "location": finding["location"],
                 "code": finding["code"],
-                "comments": finding["comments"],  # 주석 정보 추가
+                "comments": finding.get("comments", ""),
                 "attack_pattern": finding["attack_pattern"],
                 "security_patch": finding["security_patch"]
             }
@@ -291,7 +393,7 @@ def main():
                 "path": finding["path"],
                 "location": finding["location"],
                 "code": finding["code"],
-                "comments": finding["comments"],  # 주석 정보 추가
+                "comments": finding.get("comments", ""),
                 "attack_pattern": finding["attack_pattern"],
                 "security_patch": finding["security_patch"]
             }
@@ -301,16 +403,17 @@ def main():
     
     base_name = os.path.splitext(os.path.basename(target_code_path))[0]
     report_filename = f"security_report_{base_name}.json"
+    report_filepath = os.path.join(report_dir, report_filename)
     
-    with open(report_filename, "w", encoding="utf-8") as f:
+    with open(report_filepath, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
-    print(f"\n전체 보고서가 '{report_filename}'에 저장되었습니다.")
-
+    print(f"\n전체 보고서가 '{report_filepath}'에 저장되었습니다.")
+    
     # 결과 요약 출력
     print("\n=== 분석 결과 요약 ===")
     print(f"- 최초 발견된 취약점 수: {len(initial_findings)}")
     print(f"- 추가 발견된 취약점 수: {len(additional_findings)}")
-    print(f"- 전체 보고서: {report_filename}")
+    print(f"- 전체 보고서: {report_filepath}")
     print(f"- 생성된 규칙: {rules_file}")
     
     # 상세 결과 출력

@@ -4,6 +4,7 @@ import chardet
 from openai import OpenAI
 
 
+
 client = OpenAI(api_key="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")
 
 # 인코딩 자동 감지 함수
@@ -15,6 +16,27 @@ def read_file_with_detected_encoding(path):
         return raw.decode(encoding, errors="replace").splitlines()
     except Exception as e:
         return [f" 코드 스니펫을 읽는 중 오류 발생: {e}"]
+    
+# 주석 강조 및 추출 함수
+def emphasize_and_extract_comments(code_lines, file_path):
+    ext = os.path.splitext(file_path)[1].lower()
+    emphasized_lines = []
+    comment_only = []
+    for line in code_lines:
+        stripped = line.strip()
+        is_comment = False
+        if ext in [".py"]:
+            if stripped.startswith("#"):
+                is_comment = True
+        elif ext in [".js", ".ts", ".java", ".c", ".cpp"]:
+            if stripped.startswith("//") or stripped.startswith("/*") or stripped.endswith("*/"):
+                is_comment = True
+        if is_comment:
+            emphasized_lines.append(f"주석: {line}")
+            comment_only.append(line)
+        else:
+            emphasized_lines.append(line)
+    return "\n".join(emphasized_lines), "\n".join(comment_only)
 
 # Semgrep 결과 파일 로드
 try:
@@ -35,6 +57,8 @@ prompt = (
 )
 
 results = semgrep_results.get("results", [])
+all_detected_comments =[] #주석만 따로 저장
+
 if not results:
     prompt += " 취약점이 탐지되지 않았습니다.\n"
 else:
@@ -49,14 +73,15 @@ else:
 
         message = finding.get("extra", {}).get("message", "")
 
-        #  실제 코드 파일에서 주석 포함 스니펫 추출
+       # 코드 스니펫 추출 (주석 강조 + 주석만 저장)
         lines = read_file_with_detected_encoding(path)
         start = max(line - 3, 0)
         end = min(line + 2, len(lines))
-        snippet = "\n".join(lines[start:end])
+        snippet, comment_only = emphasize_and_extract_comments(lines[start:end], path)
+        all_detected_comments.append(f"[{check_id}] {path} (Line {line})\n{comment_only}\n")
 
         #  프롬프트에 추가
-        prompt += f"🔍 [{check_id}] {path} (Line {line})\n"
+        prompt += f" [{check_id}] {path} (Line {line})\n"
         prompt += f"설명: {message}\n"
         prompt += f"코드 및 주석:\n{snippet}\n\n"
 
@@ -72,3 +97,8 @@ response = client.chat.completions.create(
 #  결과 출력
 print("\n보안 분석 결과:")
 print(response.choices[0].message.content)
+
+# 탐지된 주석만 별도로 출력
+print("\n탐지된 주석 목록:")
+for c in all_detected_comments:
+    print(c)

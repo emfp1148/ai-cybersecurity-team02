@@ -26,22 +26,18 @@ PYTHON_BIN = "python3"
 ANALYZER_SCRIPT = "alpha_vat.py"
 # =================================
 
-# 디렉토리 준비
 for d in [STATIC_DIR, TEMPLATE_DIR, DATA_DIR, UPLOAD_DIR, TMP_DIR, UNPACKED_DIR, RESULT_DIR, SECURITY_JSON_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
-# 정적 파일/템플릿
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 
-# 1) 홈: index.html (템플릿)
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-# 2) 업로드 API: JSON 응답
 @app.post("/api/upload", response_class=JSONResponse)
 async def api_upload(zip_file: UploadFile = File(...)):
     # 파일명 검증
@@ -49,7 +45,6 @@ async def api_upload(zip_file: UploadFile = File(...)):
     if not filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="zip 파일만 업로드 가능합니다.")
 
-    # Job 설정
     job_id = uuid.uuid4().hex[:12]
     saved_zip_path = UPLOAD_DIR / f"{job_id}_{filename}"
     tmp_job_dir = TMP_DIR / job_id
@@ -57,14 +52,12 @@ async def api_upload(zip_file: UploadFile = File(...)):
     report_txt_path = RESULT_DIR / f"{job_id}_report.txt"
     report_json_path = RESULT_DIR / f"{job_id}_security_report.json"
 
-    # 저장
     try:
         with open(saved_zip_path, "wb") as f:
             f.write(await zip_file.read())
     except Exception as e:
         raise HTTPException(500, f"파일 저장 실패: {e}")
 
-    # 압축 해제(임시→최종)
     try:
         if tmp_job_dir.exists():
             shutil.rmtree(tmp_job_dir)
@@ -83,7 +76,6 @@ async def api_upload(zip_file: UploadFile = File(...)):
         shutil.rmtree(tmp_job_dir, ignore_errors=True)
         raise HTTPException(500, f"작업 디렉터리 이동 실패: {e}")
 
-    # 분석 실행
     try:
         proc = subprocess.run(
             [PYTHON_BIN, ANALYZER_SCRIPT, str(final_unpacked_dir)],
@@ -98,14 +90,12 @@ async def api_upload(zip_file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(500, f"분석 실행 실패: {e}")
 
-    # 리포트 저장(txt)
     try:
         with open(report_txt_path, "w", encoding="utf-8") as rf:
             rf.write(proc.stdout)
     except Exception:
         pass
 
-    # security_report 내 최신 json을 result로 복사
     try:
         latest_json = None
         latest_mtime = -1
@@ -121,7 +111,6 @@ async def api_upload(zip_file: UploadFile = File(...)):
     except Exception:
         pass
 
-    # API JSON 응답 → 프론트는 /result/{job_id}로 이동
     return {
         "job_id": job_id,
         "paths": {
@@ -135,7 +124,6 @@ async def api_upload(zip_file: UploadFile = File(...)):
     }
 
 
-# 3) 결과 페이지(템플릿 렌더)
 @app.get("/result/{job_id}", response_class=HTMLResponse)
 async def result_page(request: Request, job_id: str):
     if not job_id.isalnum():
@@ -159,7 +147,6 @@ async def result_page(request: Request, job_id: str):
     return templates.TemplateResponse("result.html", context)
 
 
-# 4) 다운로드 API
 @app.get("/api/download/{job_id}/{kind}")
 async def download_result(job_id: str, kind: str):
     if not job_id.isalnum():

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Zip 파일 업로드</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>📦 Zip 파일 업로드</h1>
+    <form id="uploadForm">
+      <input type="file" name="zip_file" accept=".zip" required />
+      <button type="submit">업로드 및 분석</button>
+    </form>
+
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <p>업로드 및 분석 중입니다... 잠시만 기다려 주세요.</p>
+    </div>
+
+    <div id="error" class="error hidden"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
+

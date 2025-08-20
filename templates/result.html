@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>분석 결과</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="container large">
+    <h1>분석 결과</h1>
+
+    <div class="grid">
+      <div class="item"><span class="label">JOB ID:</span> {{ job_id }}</div>
+    </div>
+
+    <div class="actions">
+      <a class="btn" href="{{ txt_download }}">텍스트 리포트 다운로드 (.txt)</a>
+      <a class="btn secondary" href="{{ json_download }}">JSON 리포트 다운로드 (.json)</a>
+      <a class="btn light" href="/">다른 파일 업로드</a>
+    </div>
+
+    <h2 class="sub">콘솔 출력</h2>
+    <pre class="console">{{ stdout | e }}</pre>
+
+    <div class="back">
+      <a class="btn light" href="/">← 돌아가기</a>
+    </div>
+  </div>
+</body>
+</html>
+

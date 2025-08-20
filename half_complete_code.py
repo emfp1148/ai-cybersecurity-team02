@@ -4,6 +4,7 @@ import openai
 import os
 import sys
 import yaml
+import chardet
 from typing import List, Dict, Set, Tuple
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -67,9 +68,73 @@ def is_overlap(range1: Tuple[int, int], range2: Tuple[int, int]) -> bool:
     start2, end2 = range2
     return not (end1 < start2 or end2 < start1)
 
+def read_file_with_detected_encoding(path: str) -> List[str]:
+    """파일의 인코딩을 자동으로 감지하여 읽습니다."""
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+            encoding = chardet.detect(raw)["encoding"] or "utf-8"
+        return raw.decode(encoding, errors="replace").splitlines()
+    except Exception as e:
+        return [f"코드 스니펫을 읽는 중 오류 발생: {e}"]
+
+def emphasize_and_extract_comments(code_lines: List[str], file_path: str) -> Tuple[str, str]:
+    """코드에서 주석을 강조하고 추출합니다."""
+    ext = os.path.splitext(file_path)[1].lower()
+    emphasized_lines = []
+    comment_only = []
+
+    # 단일 라인 주석
+    single_line_comments = {
+        ".py": "#", ".sh": "#", ".bash": "#", ".rb": "#", ".pl": "#", ".r": "#", ".jl": "#",
+        ".sql": "--",
+        ".js": "//", ".ts": "//", ".java": "//", ".c": "//", ".cpp": "//", ".go": "//", ".cs": "//",
+        ".swift": "//", ".kt": "//", ".scala": "//",
+    }
+
+    # 다중 라인 주석
+    multi_line_comments = {
+        ".js": ("/*", "*/"), ".ts": ("/*", "*/"), ".java": ("/*", "*/"),
+        ".c": ("/*", "*/"), ".cpp": ("/*", "*/"), ".go": ("/*", "*/"), ".cs": ("/*", "*/"),
+        ".swift": ("/*", "*/"), ".kt": ("/*", "*/"), ".scala": ("/*", "*/"),
+        ".html": ("<!--", "-->"), ".xml": ("<!--", "-->"),
+    }
+
+    in_multiline = False
+    start_tag, end_tag = multi_line_comments.get(ext, (None, None))
+
+    for line in code_lines:
+        stripped = line.strip()
+        is_comment = False
+
+        # 다중라인 주석 처리
+        if start_tag and end_tag:
+            if in_multiline:
+                is_comment = True
+                if end_tag in stripped:
+                    in_multiline = False
+            elif start_tag in stripped:
+                is_comment = True
+                if end_tag not in stripped:
+                    in_multiline = True
+
+        # 단일라인 주석 처리
+        marker = single_line_comments.get(ext)
+        if marker and stripped.startswith(marker):
+            is_comment = True
+
+        if is_comment:
+            emphasized_lines.append(f"주석: {line}")
+            comment_only.append(line)
+        else:
+            emphasized_lines.append(line)
+
+    return "\n".join(emphasized_lines), "\n".join(comment_only)
+
 def postprocess_semgrep_results(semgrep_json: dict) -> List[Dict]:
     processed_results = []
     seen_ranges = {}  # {파일경로: [(start_line,end_line), ...]}
+    all_detected_comments = []  # 주석만 따로 저장
 
     findings = semgrep_json.get("results", [])
     for finding in findings:
@@ -86,9 +151,17 @@ def postprocess_semgrep_results(semgrep_json: dict) -> List[Dict]:
         
         seen_ranges[path].append((start, end))
         
-        # 코드 스니펫 추출
-        code_snippet = read_code_snippet(path, start, end)
+        # 코드 스니펫과 주석 추출
+        lines = read_file_with_detected_encoding(path)
+        start_idx = max(start - 3, 0)
+        end_idx = min(end + 2, len(lines))
+        snippet_lines = lines[start_idx:end_idx]
+        
+        code_snippet, comments = emphasize_and_extract_comments(snippet_lines, path)
         vuln_id = finding.get("check_id", "Unknown")
+        
+        if comments:
+            all_detected_comments.append(f"[{vuln_id}] {path} (Line {start})\n{comments}\n")
         
         print(f"LLM 분석 중... 취약점 ID: {vuln_id}")
         attack_pattern = generate_attack_pattern(vuln_id, code_snippet)
@@ -99,9 +172,16 @@ def postprocess_semgrep_results(semgrep_json: dict) -> List[Dict]:
             "path": path,
             "location": {"start": start, "end": end},
             "code": code_snippet,
+            "comments": comments,  # 주석 정보 추가
             "attack_pattern": attack_pattern,
             "security_patch": security_patch,
         })
+
+    # 탐지된 주석 출력
+    if all_detected_comments:
+        print("\n탐지된 주석 목록:")
+        for comment in all_detected_comments:
+            print(comment)
 
     return processed_results
 
@@ -198,6 +278,7 @@ def main():
                 "path": finding["path"],
                 "location": finding["location"],
                 "code": finding["code"],
+                "comments": finding["comments"],  # 주석 정보 추가
                 "attack_pattern": finding["attack_pattern"],
                 "security_patch": finding["security_patch"]
             }
@@ -210,6 +291,7 @@ def main():
                 "path": finding["path"],
                 "location": finding["location"],
                 "code": finding["code"],
+                "comments": finding["comments"],  # 주석 정보 추가
                 "attack_pattern": finding["attack_pattern"],
                 "security_patch": finding["security_patch"]
             }
@@ -248,4 +330,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

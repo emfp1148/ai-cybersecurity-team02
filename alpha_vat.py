@@ -24,7 +24,6 @@ def run_semgrep_scan(target_path: str, config_path: str) -> dict:
         config_path = os.path.abspath(config_path)
     
     try:
-        # 환경 변수 설정으로 경고 메시지 억제
         env = os.environ.copy()
         env["PYTHONWARNINGS"] = "ignore"
         
@@ -39,7 +38,7 @@ def run_semgrep_scan(target_path: str, config_path: str) -> dict:
             stderr=subprocess.PIPE,
             text=True,
             check=False,
-            env=env  # 수정된 환경 변수 적용
+            env=env  
         )
         
         # 실제 오류와 경고 구분
@@ -61,7 +60,6 @@ def run_semgrep_scan(target_path: str, config_path: str) -> dict:
         raise RuntimeError("Semgrep이 설치되어 있지 않습니다. 'pip install semgrep'로 설치해주세요.")
     except Exception as e:
         if "WARNING" in str(e) or "UserWarning" in str(e):
-            # 경고는 무시하고 빈 결과 반환
             print("경고를 무시하고 계속 진행합니다.")
             return {"results": []}
         raise RuntimeError(f"예기치 않은 오류 발생: {str(e)}")
@@ -216,7 +214,6 @@ def postprocess_semgrep_results(semgrep_json: dict) -> List[Dict]:
             "security_patch": security_patch,
         })
 
-    # 탐지된 주석 출력
     #if all_detected_comments:
     #    for comment in all_detected_comments:
 
@@ -406,7 +403,6 @@ def main():
     print(f"- 최초 발견된 취약점 수: {len(initial_findings)}")
     print(f"- 추가 발견된 취약점 수: {len(additional_findings)}")
     
-    # 상세 결과 출력
     print("\n=== 상세 분석 결과 ===")
     for idx, finding in enumerate(initial_findings + additional_findings, 1):
         print(f"\n--- 취약점 #{idx} ---")

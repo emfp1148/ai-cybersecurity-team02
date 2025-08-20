@@ -32,7 +32,8 @@ def read_code_snippet(path: str, start_line: int, end_line: int) -> str:
 
 def generate_attack_example(vuln_code: str) -> str:
     prompt = (
-        f"아래 코드에서 발생할 수 있는 취약점에 대해 어떤 공격 구문이 있을지 테스트 할 수 있는 공격 구문만 작성하여 출력해줘. 예를 들어 sqli 이면 ' or 1=1 -- 이런 식으로. 취약점에 대해서는 설명하지 마. 공격 구문을 제시 못하는 경우 또는 구문 만들기 어려울거 같은 경우는 그냥 -. 그리고 설명은 하지 마.:\n{vuln_code}"
+        f"아래 코드에서 발생할 수 있는 취약점에 대해 어떤 공격 구문이 있을지 테스트 할 수 있는 공격 구문만 작성하여 출력해줘. "
+        f"예를 들어 sqli 이면 ' or 1=1 -- 이런 식으로. 취약점에 대해서는 설명하지 마. 공격 구문을 제시 못하는 경우 또는 구문 만들기 어려울거 같은 경우는 그냥 -. 그리고 설명은 하지 마.:\n{vuln_code}"
     )
     response = openai.chat.completions.create(
         model="gpt-4",
@@ -41,9 +42,20 @@ def generate_attack_example(vuln_code: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
+def generate_patch_suggestion(vuln_code: str) -> str:
+    prompt = (
+        f"아래 취약한 코드를 보안 패치를 적용한 안전한 코드로 수정해줘. "
+        f"원본 구조와 기능은 유지하되 보안 취약점만 해결하고, 기존 주석은 건드리지 말고 새 주석을 추가하지 마. "
+        f"수정된 코드만 출력하고 설명은 하지 마:\n{vuln_code}"
+    )
+    response = openai.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1000
+    )
+    return response.choices[0].message.content.strip()
+
 def is_overlap(range1: tuple, range2: tuple) -> bool:
-    # range1 = (start_line1, end_line1)
-    # range2 = (start_line2, end_line2)
     start1, end1 = range1
     start2, end2 = range2
     return not (end1 < start2 or end2 < start1)
@@ -98,6 +110,10 @@ def main():
         print("=== 테스트 공격 구문 ===")
         attack_example = generate_attack_example(vuln_code)
         print(attack_example + "\n")
+
+        print("=== 보안 패치 권고 ===")
+        patch_suggestion = generate_patch_suggestion(vuln_code)
+        print(patch_suggestion + "\n")
 
 if __name__ == "__main__":
     main()

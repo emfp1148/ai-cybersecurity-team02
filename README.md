@@ -85,7 +85,10 @@ source venv/bin/activate  # Linux/Mac
 pip install fastapi uvicorn python-multipart jinja2 aiofiles
 ```
 
-### 4. 서버 실행
+### 4. 환경 변수 등록
+echo 'export OPENAI_API_KEY="...your_key..."' >> ~/.bashrc
+
+### 5. 서버 실행
 ```bash
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```

@@ -3,7 +3,7 @@ import json
 import openai
 import os
 import sys
-import yaml # 파일 상단에 import yaml 추가 필요
+import yaml
 from typing import List, Dict, Set
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -234,3 +234,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+

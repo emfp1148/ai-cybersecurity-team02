@@ -82,7 +82,7 @@ source venv/bin/activate  # Linux/Mac
 
 ### 3. 의존성 설치
 ```bash
-pip install fastapi uvicorn python-multipart jinja2 aiofiles openai semgrep
+pip install -r requirements.txt
 ```
 
 ### 4. 환경 변수 등록

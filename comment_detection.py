@@ -101,4 +101,4 @@ print(response.choices[0].message.content)
 # 탐지된 주석만 별도로 출력
 print("\n탐지된 주석 목록:")
 for c in all_detected_comments:
-    print(c)
+    print(c) 

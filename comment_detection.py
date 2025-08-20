@@ -22,20 +22,52 @@ def emphasize_and_extract_comments(code_lines, file_path):
     ext = os.path.splitext(file_path)[1].lower()
     emphasized_lines = []
     comment_only = []
+
+    # 단일 라인 주석
+    single_line_comments = {
+        ".py": "#", ".sh": "#", ".bash": "#", ".rb": "#", ".pl": "#", ".r": "#", ".jl": "#",
+        ".sql": "--",
+        ".js": "//", ".ts": "//", ".java": "//", ".c": "//", ".cpp": "//", ".go": "//", ".cs": "//",
+        ".swift": "//", ".kt": "//", ".scala": "//",
+    }
+
+    # 다중 라인 주석
+    multi_line_comments = {
+        ".js": ("/*", "*/"), ".ts": ("/*", "*/"), ".java": ("/*", "*/"),
+        ".c": ("/*", "*/"), ".cpp": ("/*", "*/"), ".go": ("/*", "*/"), ".cs": ("/*", "*/"),
+        ".swift": ("/*", "*/"), ".kt": ("/*", "*/"), ".scala": ("/*", "*/"),
+        ".html": ("<!--", "-->"), ".xml": ("<!--", "-->"),
+    }
+
+    in_multiline = False
+    start_tag, end_tag = multi_line_comments.get(ext, (None, None))
+
     for line in code_lines:
         stripped = line.strip()
         is_comment = False
-        if ext in [".py"]:
-            if stripped.startswith("#"):
+
+        # 다중라인 주석 처리
+        if start_tag and end_tag:
+            if in_multiline:
                 is_comment = True
-        elif ext in [".js", ".ts", ".java", ".c", ".cpp"]:
-            if stripped.startswith("//") or stripped.startswith("/*") or stripped.endswith("*/"):
+                if end_tag in stripped:
+                    in_multiline = False
+            elif start_tag in stripped:
                 is_comment = True
+                if end_tag not in stripped:
+                    in_multiline = True
+
+        # 단일라인 주석 처리
+        marker = single_line_comments.get(ext)
+        if marker and stripped.startswith(marker):
+            is_comment = True
+
         if is_comment:
             emphasized_lines.append(f"주석: {line}")
             comment_only.append(line)
         else:
             emphasized_lines.append(line)
+
     return "\n".join(emphasized_lines), "\n".join(comment_only)
 
 # Semgrep 결과 파일 로드

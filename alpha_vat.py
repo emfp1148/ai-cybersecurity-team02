@@ -7,7 +7,7 @@ import yaml
 import chardet
 from typing import List, Dict, Set, Tuple
 
-openai.api_key = ""
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 target_code_path = ""
 

@@ -7,7 +7,7 @@ import yaml
 import chardet
 from typing import List, Dict, Set, Tuple
 
-openai.api_key = "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"
+openai.api_key = ""
 
 target_code_path = ""
 

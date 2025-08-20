@@ -48,20 +48,20 @@
 ```
 ai-cybersecurity-team02/
 ├── app.py                      # FastAPI 메인 애플리케이션
-├── half_complete_code.py       # 보안 분석 스크립트 (메인 분석 엔진)
+├── alpha_vat.py                # 보안 분석 스크립트 (메인 분석 엔진)
 ├── static/                     # 정적 파일
-│   ├── app.js                 # 프론트엔드 JavaScript
-│   └── styles.css             # CSS 스타일시트
+│   ├── app.js                  # 프론트엔드 JavaScript
+│   └── styles.css              # CSS 스타일시트
 ├── templates/                  # Jinja2 HTML 템플릿
-│   ├── index.html             # 메인 업로드 페이지
-│   └── result.html            # 결과 확인 페이지
+│   ├── index.html              # 메인 업로드 페이지
+│   └── result.html             # 결과 확인 페이지
 ├── data/                       # 데이터 저장 디렉터리
-│   ├── uploads/               # 업로드된 파일
-│   ├── tmp/                   # 임시 작업 폴더
-│   └── unpacked/              # 압축 해제된 파일
+│   ├── uploads/                # 업로드된 파일
+│   ├── tmp/                    # 임시 작업 폴더
+│   └── unpacked/               # 압축 해제된 파일
 ├── result/                     # 분석 결과 저장
-├── security_report/           # 보안 리포트 (JSON 형식)
-├── 출력 json 예시/            # 출력 예시 파일
+├── security_report/            # 보안 리포트 (JSON 형식)
+├── 출력 json 예시/              # 출력 예시 파일
 └── README.md
 ```
 

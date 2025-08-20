@@ -7,9 +7,10 @@
         "start": 8,
         "end": 17
       },
-      "code": "    user_id = request.args.get('id')\n    \n    # This is the vulnerability that Semgrep might miss initially\n    conn = sqlite3.connect('test.db')\n    cursor = conn.cursor()\n    \n    # Insecure query generation\n    query = f\"SELECT * FROM users WHERE id='{user_id}'\"\n    \n    cursor.execute(query)\n",
-      "attack_pattern": "' OR '1'='1",
-      "security_patch": "user_id = request.args.get('id')\n\n# This is the vulnerability that Semgrep might miss initially\nconn = sqlite3.connect('test.db')\ncursor = conn.cursor()\n\n# Insecure query generation\n# Changed from formatting strings to using ? as placeholder for SQL parameters\nquery = \"SELECT * FROM users WHERE id=?\"\n\ncursor.execute(query, (user_id,))"
+      "code": "@app.route('/users')\ndef get_users():\n    user_id = request.args.get('id')\n    \n주석:     # This is the vulnerability that Semgrep might miss initially\n    conn = sqlite3.connect('test.db')\n    cursor = conn.cursor()\n    \n주석:     # Insecure query generation\n    query = f\"SELECT * FROM users WHERE id='{user_id}'\"\n    \n    cursor.execute(query)\n    users = cursor.fetchall()\n    conn.close()",
+      "comments": "    # This is the vulnerability that Semgrep might miss initially\n    # Insecure query generation",
+      "attack_pattern": "'; DROP TABLE users; --",
+      "security_patch": "@app.route('/users')\ndef get_users():\n    user_id = request.args.get('id')\n    \n    # This is the vulnerability that Semgrep might miss initially\n    conn = sqlite3.connect('test.db')\n    cursor = conn.cursor()\n    \n    # Insecure query generation\n    query = \"SELECT * FROM users WHERE id=?\"\n    \n    cursor.execute(query, (user_id,))\n    users = cursor.fetchall()\n    conn.close()"
     }
   ],
   "new_rules": {
@@ -23,9 +24,10 @@
         "start": 8,
         "end": 8
       },
-      "code": "    user_id = request.args.get('id')\n",
-      "attack_pattern": "' or '1'='1",
-      "security_patch": "보안 취약점이 있는 것으로 보이는 파이썬 코드의 경우, SQL 인젝션 공격의 영향을 받을 수 있습니다. 해결 방법 중 하나는 사용자 입력을 적절하게 이스케이핑하거나, 아니면 파라미터를 직접 쓰지 않고 매개변수로 사용하는 것입니다. 아래처럼 바꿔볼 수 있겠습니다.\n\n```python\nfrom flask import request\nfrom werkzeug.datastructures import MultiDict\n\ndef safe_get_id(request):\n    safe_args = MultiDict(request.args)\n    user_id = safe_args.get('id')\n\nss = safe_get_id(request)\n```  \n\n위 코드는 더 안전하게 사용자 입력을 처리합니다. MultiDict는 get 메서드를 사용하여 안전하게 매개변수를 가져오며, 예상치 못한 행동을 방지합니다. 이러한 방식은 코드를 보다 안전하게 만드는 데 도움이 됩니다. 하지만 웹 애플리케이션 공격을 완전히 방지하기 위해선 보안 연구와 기타 보안 방법을 포함한 광범위한 접근이 필요합니다."
+      "code": "@app.route('/users')\ndef get_users():\n    user_id = request.args.get('id')\n    \n주석:     # This is the vulnerability that Semgrep might miss initially",
+      "comments": "    # This is the vulnerability that Semgrep might miss initially",
+      "attack_pattern": "'user_id=%27+OR+1%3D1--",
+      "security_patch": "@app.route('/users')\ndef get_users():\n    user_id = int(request.args.get('id')) \n\n# I changed 'user_id' variable to make sure it is an integer which helps to prevent SQL injection attacks."
     }
   ]
 }

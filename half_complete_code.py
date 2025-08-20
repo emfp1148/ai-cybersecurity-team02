@@ -9,7 +9,7 @@ from typing import List, Dict, Set, Tuple
 
 openai.api_key = "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"
 
-TARGET_CODE_PATH = ""
+target_code_path = ""
 
 if not openai.api_key:
     raise RuntimeError("환경변수 OPENAI_API_KEY가 설정되지 않았습니다. 먼저 설정해주세요.")
@@ -19,7 +19,6 @@ SEMGREP_CONFIG_PATH = "p/owasp-top-ten"
 
 def run_semgrep_scan(target_path: str, config_path: str) -> dict:
     """Semgrep으로 코드를 스캔합니다."""
-    print(f"Semgrep 스캔을 시작합니다: 대상 경로='{target_path}'")
     
     if not config_path.startswith("p/"):
         config_path = os.path.abspath(config_path)
@@ -204,7 +203,6 @@ def postprocess_semgrep_results(semgrep_json: dict) -> List[Dict]:
         if comments:
             all_detected_comments.append(f"[{vuln_id}] {path} (Line {start})\n{comments}\n")
         
-        print(f"LLM 분석 중... 취약점 ID: {vuln_id}")
         attack_pattern = generate_attack_pattern(vuln_id, code_snippet)
         security_patch = generate_security_patch(vuln_id, code_snippet)
 
@@ -219,10 +217,8 @@ def postprocess_semgrep_results(semgrep_json: dict) -> List[Dict]:
         })
 
     # 탐지된 주석 출력
-    if all_detected_comments:
-        print("\n탐지된 주석 목록:")
-        for comment in all_detected_comments:
-            print(comment)
+    #if all_detected_comments:
+    #    for comment in all_detected_comments:
 
     return processed_results
 
@@ -276,7 +272,6 @@ def ensure_directory_exists(directory: str) -> None:
     """지정된 디렉토리가 없으면 생성합니다."""
     if not os.path.exists(directory):
         os.makedirs(directory)
-        print(f"디렉토리 생성됨: {directory}")
 
 def save_new_rules(rules: str, target_path: str) -> str:
     """생성된 규칙을 YAML 파일로 저장합니다."""
@@ -312,8 +307,6 @@ def save_new_rules(rules: str, target_path: str) -> str:
         return filepath
         
     except (yaml.YAMLError, ValueError) as e:
-        print(f"경고: 생성된 규칙에 문제가 있습니다: {e}")
-        print("GPT에 규칙 재생성을 요청합니다...")
         
         # 규칙 재생성 시도
         prompt = f"""이전 규칙 생성에 문제가 있었습니다. 다음 형식을 정확히 지켜서 다시 작성해주세요:
@@ -341,7 +334,7 @@ rules:
         return filepath
 
 def main():
-    global TARGET_CODE_PATH
+    global target_code_path
 
     if len(sys.argv) >= 2:
         target_code_path = sys.argv[1]
@@ -350,23 +343,18 @@ def main():
         target_code_path = input("검사할 코드 경로를 입력하세요 (예: ./a): ").strip()
 
     # 1. 기존 스캔 실행
-    print("\n[1/4] 기본 보안 규칙으로 스캔 중...")
     semgrep_result = run_semgrep_scan(target_code_path, SEMGREP_CONFIG_PATH)
     initial_findings = postprocess_semgrep_results(semgrep_result)
 
     # 2. 새로운 규칙 생성
-    print("\n[2/4] 추가 보안 규칙 생성 중...")
     new_rules = generate_new_rules(initial_findings)
     rules_file = save_new_rules(new_rules, target_code_path)
-    print(f"새로운 규칙이 '{rules_file}'에 저장되었습니다.")
 
     # 3. 새로운 규칙으로 추가 스캔
-    print("\n[3/4] 새로운 규칙으로 추가 스캔 중...")
     additional_result = run_semgrep_scan(target_code_path, rules_file)
     additional_findings = postprocess_semgrep_results(additional_result)
 
     # 4. 전체 보고서 생성
-    print("\n[4/4] 최종 보고서 생성 중...")
     
     # security_report 폴더 생성
     report_dir = "security_report"
@@ -376,7 +364,6 @@ def main():
     try:
         parsed_rules = yaml.safe_load(new_rules)
     except yaml.YAMLError as e:
-        print(f"경고: 규칙 파싱 중 오류 발생: {e}")
         parsed_rules = {"rules": []}
     
     report = {
@@ -413,27 +400,26 @@ def main():
     
     with open(report_filepath, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
-    print(f"\n전체 보고서가 '{report_filepath}'에 저장되었습니다.")
     
     # 결과 요약 출력
     print("\n=== 분석 결과 요약 ===")
     print(f"- 최초 발견된 취약점 수: {len(initial_findings)}")
     print(f"- 추가 발견된 취약점 수: {len(additional_findings)}")
-    print(f"- 전체 보고서: {report_filepath}")
-    print(f"- 생성된 규칙: {rules_file}")
     
     # 상세 결과 출력
     print("\n=== 상세 분석 결과 ===")
     for idx, finding in enumerate(initial_findings + additional_findings, 1):
         print(f"\n--- 취약점 #{idx} ---")
         print(f"룰 ID: {finding['check_id']}")
-        print(f"파일 경로: {finding['path']}")
+        tacp = target_code_path.replace('./','')
+        Path = finding['path'].replace(tacp,'')
+        print(f"파일 경로: {Path}")
         print(f"취약 코드 위치: {finding['location']['start']} line부터 {finding['location']['end']} line까지\n")
-        print("=== 취약 코드 스니펫 ===")
+        print("=== 취약 코드 ===")
         print(finding['code'])
-        print("\n=== 공격 패턴 분석 ===")
+        print("\n=== 예상 공격 페이로드 ===")
         print(finding['attack_pattern'])
-        print("\n=== 보안 패치 권고 ===")
+        print("\n=== 보안 패치 방안 ===")
         print(finding['security_patch'])
         print("=" * 80)
 

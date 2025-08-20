@@ -6,7 +6,7 @@ import sys
 import yaml
 from typing import List, Dict, Set, Tuple
 
-openai.api_key = "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"
+openai.api_key = os.getenv("OPENAI_API_KEY")
 if not openai.api_key:
     raise RuntimeError("환경변수 OPENAI_API_KEY가 설정되지 않았습니다. 먼저 설정해주세요.")
 
@@ -247,4 +247,5 @@ def main():
         print("=" * 80)
 
 if __name__ == "__main__":
+
     main()

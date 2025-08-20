@@ -11,7 +11,6 @@ def login():
     conn = sqlite3.connect('example.db')
     cursor = conn.cursor()
 
-    # 취약: 사용자 입력을 직접 SQL문에 포함 (SQL Injection 가능)
     query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
     cursor.execute(query)
 

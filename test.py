@@ -24,22 +24,11 @@ def read_code_snippet(path: str, start_line: int, end_line: int) -> str:
     try:
         with open(path, encoding="utf-8") as f:
             lines = f.readlines()
-        # 파일 크기 벗어나지 않도록 경계처리
         start = max(0, start_line - 1)
         end = min(len(lines), end_line)
-        snippet = "".join(lines[start:end])
-        return snippet
+        return "".join(lines[start:end])
     except Exception as e:
         return f"코드 스니펫을 읽을 수 없습니다: {e}"
-
-def translate_to_korean(text: str) -> str:
-    prompt = f"아래 내용을 한국어로 요약하여 번역해줘:\n{text}"
-    response = openai.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=500
-    )
-    return response.choices[0].message.content.strip()
 
 def generate_attack_example(vuln_code: str) -> str:
     prompt = (
@@ -52,14 +41,13 @@ def generate_attack_example(vuln_code: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
-def format_extra(extra: dict) -> str:
-    # message는 제외하고 나머지는 보기 좋게 key: value 형식 출력
-    keys_to_skip = {"message", "lines", "fingerprint", "validation_state", "engine_kind"}
-    lines = []
-    for key, val in extra.items():
-        if key not in keys_to_skip:
-            lines.append(f"{key}: {val}")
-    return "\n".join(lines) if lines else "추가 정보가 없습니다."
+def is_overlap(range1: tuple, range2: tuple) -> bool:
+    # range1 = (start_line1, end_line1)
+    # range2 = (start_line2, end_line2)
+    start1, end1 = range1
+    start2, end2 = range2
+    return not (end1 < start2 or end2 < start1)
+
 
 def main():
     target_code_path = input("검사할 코드 경로를 입력하세요 (예: ./a): ").strip()
@@ -67,16 +55,37 @@ def main():
 
     results = semgrep_result.get("results", [])
 
-    for i, finding in enumerate(results, 1):
-        print(f"--- 취약점 #{i} ---")
-        check_id = finding.get("check_id", "Unknown")
+    # 중복 체크용 딕셔너리: {파일경로: [ (start_line,end_line), ... ] }
+    seen_ranges = {}
+
+    idx = 0
+    for finding in results:
         path = finding.get("path", "Unknown path")
         start = finding.get("start", {})
         end = finding.get("end", {})
-        extra = finding.get("extra", {})
 
         start_line = start.get("line", 0)
         end_line = end.get("line", start_line)
+
+        # 기존 취약점들과 범위 중복 검사
+        has_overlap = False
+        if path in seen_ranges:
+            for existing_range in seen_ranges[path]:
+                if is_overlap(existing_range, (start_line, end_line)):
+                    has_overlap = True
+                    break
+        else:
+            seen_ranges[path] = []
+
+        if has_overlap:
+            continue  # 중복 발견 시 건너뜀
+
+        # 중복 아니면 추가
+        seen_ranges[path].append((start_line, end_line))
+
+        idx += 1
+        print(f"--- 취약점 #{idx} ---")
+        check_id = finding.get("check_id", "Unknown")
 
         print(f"룰 ID: {check_id}")
         print(f"파일 경로: {path}")
@@ -88,20 +97,7 @@ def main():
 
         print("=== 테스트 공격 구문 ===")
         attack_example = generate_attack_example(vuln_code)
-        print(attack_example + '\n')
-
-        # extra.message 한글 번역
-        #message = extra.get("message", "")
-        #if message:
-        #    print("\n=== 경고 메시 ===")
-        #    translated_msg = translate_to_korean(message)
-        #    print(translated_msg)
-
-        # extra 기타 정보 출력
-        #print("\n=== 추가 정보 ===")
-        #print(format_extra(extra))
-
-        #print("\n" + "="*70 + "\n")
+        print(attack_example + "\n")
 
 if __name__ == "__main__":
     main()

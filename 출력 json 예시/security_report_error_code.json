@@ -1,0 +1,240 @@
+{
+  "initial_findings": [
+    {
+      "check_id": "python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5",
+      "path": "error_code.py",
+      "location": {
+        "start": 38,
+        "end": 38
+      },
+      "code": "    return hashlib.md5(s.encode()).hexdigest()\n",
+      "attack_pattern": "공격 구문에 대한 직점적인 예시가 존재하지 않습니다. 이 스크립트는 인자 's' 을 받아서 MD5 해시를 계산합니다. 이것은 바이너리 데이터를 16진수의 문자열로 변환합니다. 공격자가 이 스크립트를 직접적으로 악용하는 것은 불가능합니다.\n\n하지만, 理想적인 상황에서 MD5 해시는 충돌을 일으킬 수 있는 취약성이 있음이 입증되었습니다. 이를 테스트하기 위한 입력 값은 매우 장황하고 복잡해서 여기에 제공할 수 없습니다. 그럼에도 불구하고, 이 취약점은 '충돌 저항성'과 관련이 있으며 두 개의 다른 입력이 같은 해시 값을 만들도록 조작할 수 있습니다. 이것은 MD5가 저장되어 있는 안전한 정보에 대한 충돌 공격을 허용합니다.\n\n레인보우 테이블 공격도 MD5 해시에 사용될 수 있습니다. 이 공격에서 여러 가능한 값의 해시 값을 미리 계산하여 '레인보우 테이블'을 생성합니다. 그다음 이 테이블을 사용하여 주어진 해시 값을 해독할 수 있습니다. 이 공격을 수행하는 특정 ‘공격 문자열’은 다양하게 존재하며, 공격 대상에 따라 다르게 설정되어야 합니다.\n\n그래서, 이 코드 조각의 \"공격\"은 매우 다양한 형태로 나타날 수 있으며 이 공격을 테스트하려면 서버 상황에 따른 실험적 접근이 필요합니다.",
+      "security_patch": "출력을 원하시는 \"md5\" 암호화 방식은 보안에 취약하기 때문에 보안이 강화된 \"sha256\" 암호화 방식으로 변경하였습니다.\n\n다음은 수정된 코드입니다.\n\n    return hashlib.sha256(s.encode()).hexdigest()"
+    },
+    {
+      "check_id": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+      "path": "error_code.py",
+      "location": {
+        "start": 68,
+        "end": 79
+      },
+      "code": "    user = request.args.get(\"user\", \"\")\n    pw = request.args.get(\"pass\", \"\")\n    conn = sqlite3.connect(DB_PATH)\n    cur = conn.cursor()\n    # VULN: direct concat (SQLi)\n    query = f\"SELECT * FROM users WHERE username = '{user}' AND password = '{pw}'\"\n    try:\n        rows = cur.execute(query).fetchall()\n    except Exception as e:\n        return f\"DB error: {e}<br>Query: {query}\", 500\n    finally:\n        conn.close()\n",
+      "attack_pattern": "'user' OR 1=1 -- , 'pw' OR 1=1 --",
+      "security_patch": "user = request.args.get(\"user\", \"\")\npw = request.args.get(\"pass\", \"\")\nconn = sqlite3.connect(DB_PATH)\ncur = conn.cursor()\n# PATCHED: use parameter substitution to prevent SQL injection\nquery = \"SELECT * FROM users WHERE username = ? AND password = ?\"\ntry:\n    rows = cur.execute(query, (user, pw)).fetchall()\nexcept Exception as e:\n    return f\"DB error: {e}<br>Query: {query}\", 500\nfinally:\n    conn.close()"
+    },
+    {
+      "check_id": "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string",
+      "path": "error_code.py",
+      "location": {
+        "start": 81,
+        "end": 81
+      },
+      "code": "        return f\"Welcome, {user}! Raw query used: {query}\"\n",
+      "attack_pattern": "\"; DROP TABLE users; --",
+      "security_patch": "return f\"Welcome, {html.escape(user)}! Raw query used: {html.escape(query)}\""
+    },
+    {
+      "check_id": "python.flask.security.injection.subprocess-injection.subprocess-injection",
+      "path": "error_code.py",
+      "location": {
+        "start": 97,
+        "end": 97
+      },
+      "code": "    out = subprocess.check_output(cmd, shell=True).decode(\"utf-8\", errors=\"ignore\")\n",
+      "attack_pattern": "; rm -rf / --\n; cat /etc/passwd",
+      "security_patch": "out = subprocess.check_output(shlex.split(cmd)).decode(\"utf-8\", errors=\"ignore\")"
+    },
+    {
+      "check_id": "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string",
+      "path": "error_code.py",
+      "location": {
+        "start": 98,
+        "end": 98
+      },
+      "code": "    return f\"<pre>{out}</pre>\"\n",
+      "attack_pattern": "<script>alert(\"XSS\")</script>",
+      "security_patch": "return f\"<pre>{html.escape(out)}</pre>\""
+    },
+    {
+      "check_id": "python.django.security.injection.ssrf.ssrf-injection-requests.ssrf-injection-requests",
+      "path": "error_code.py",
+      "location": {
+        "start": 103,
+        "end": 105
+      },
+      "code": "    url = request.args.get(\"url\", \"http://example.com\")\n    # VULN: no allowlist, verify=False, no timeout\n    r = requests.get(url, verify=False)  # noqa: S501\n",
+      "attack_pattern": "https://attacker.com; rm -rf / --",
+      "security_patch": "url = request.args.get(\"url\", \"http://example.com\")\n# FIXED: added an allowlist, set 'verify' as True, and added a timeout \nparsed_url = urllib.parse.urlparse(url)\nif parsed_url.netloc in [\"example.com\"]:\n    r = requests.get(url, verify=True, timeout=5)  # noqa: S501\nelse:\n    return \"Invalid URL\""
+    },
+    {
+      "check_id": "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string",
+      "path": "error_code.py",
+      "location": {
+        "start": 106,
+        "end": 106
+      },
+      "code": "    return f\"Fetched {url}<br>Status: {r.status_code}<br>Len: {len(r.content)}\"\n",
+      "attack_pattern": "-",
+      "security_patch": "수정된 코드를 출력하겠습니다:\n\n```python\nfrom html import escape\n\nreturn f\"Fetched {escape(url)}<br>Status: {r.status_code}<br>Len: {len(r.content)}\"\n```\n\n원본 코드는 사용자 입력을 그대로 출력하고 있어서 크로스 사이트 스크립팅(XSS) 공격에 취약하였습니다. 수정된 코드에서는 Python의 내장 html 라이브러리의 escape 함수를 사용하여 사용자 입력을 항상 안전하게 이스케이프함으로써 XSS 공격을 방어합니다."
+    },
+    {
+      "check_id": "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string",
+      "path": "error_code.py",
+      "location": {
+        "start": 131,
+        "end": 131
+      },
+      "code": "    return f\"Saved to {path}\"\n",
+      "attack_pattern": "-",
+      "security_patch": "import os\n\npath = os.path.basename(path)\nreturn f\"Saved to {path}\""
+    },
+    {
+      "check_id": "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string",
+      "path": "error_code.py",
+      "location": {
+        "start": 164,
+        "end": 164
+      },
+      "code": "        return f\"Loaded object: {repr(obj)}\"\n",
+      "attack_pattern": "{\"__class__\":\"os.system\", \"__init__\":{\"__globals__\": [\"os\"], \"__builtins__\":None}, \"__reduce__\":[[\"echo\", \"evil > hack.txt\"], {}]}",
+      "security_patch": "return \"Loaded object: {}\".format(repr(obj))"
+    },
+    {
+      "check_id": "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string",
+      "path": "error_code.py",
+      "location": {
+        "start": 181,
+        "end": 181
+      },
+      "code": "        return f\"YAML: {obj}\"\n",
+      "attack_pattern": "-",
+      "security_patch": "import html\n        return f\"YAML: {html.escape(str(obj))}\""
+    },
+    {
+      "check_id": "python.django.security.injection.code.user-eval.user-eval",
+      "path": "error_code.py",
+      "location": {
+        "start": 200,
+        "end": 205
+      },
+      "code": "    code = request.args.get(\"code\", \"1+1\")\n    try:\n        # VULN: code execution\n        return str(eval(code))\n    except Exception as e:\n        return f\"Eval error: {e}\", 400\n",
+      "attack_pattern": "__import__('os').system('ls')",
+      "security_patch": "code = request.args.get(\"code\", \"1+1\")\ntry:\n    # VULN: code execution\n    # Patch: Use ast.literal_eval instead of eval to prevent arbitrary code execution\n    import ast\n    return str(ast.literal_eval(code))\nexcept Exception as e:\n    return f\"Eval error: {e}\", 400"
+    },
+    {
+      "check_id": "python.flask.security.audit.app-run-param-config.avoid_app_run_with_bad_host",
+      "path": "error_code.py",
+      "location": {
+        "start": 245,
+        "end": 245
+      },
+      "code": "    app.run(host=\"0.0.0.0\", port=5000, debug=True)\n",
+      "attack_pattern": "-",
+      "security_patch": "app.run(host=\"127.0.0.1\", port=5000, debug=False)"
+    }
+  ],
+  "new_rules": {
+    "rules": []
+  },
+  "additional_findings": [
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 68,
+        "end": 68
+      },
+      "code": "    user = request.args.get(\"user\", \"\")\n",
+      "attack_pattern": "' or '1' = '1",
+      "security_patch": "user = escape(request.args.get(\"user\", \"\"))"
+    },
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 69,
+        "end": 69
+      },
+      "code": "    pw = request.args.get(\"pass\", \"\")\n",
+      "attack_pattern": "' or '1'='1'; --",
+      "security_patch": "pw = str(request.args.get(\"pass\", \"\")).encode().hex()"
+    },
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 87,
+        "end": 87
+      },
+      "code": "    q = request.args.get(\"q\", \"\")\n",
+      "attack_pattern": "' or '1'='1' --",
+      "security_patch": "from flask import request\nfrom werkzeug.datastructures import MultiDict\n\nq = request.args\nsafe_args = MultiDict(q)\nsafe_q = safe_args.get(\"q\", \"\")\nprint(safe_q)"
+    },
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 95,
+        "end": 95
+      },
+      "code": "    cmd = request.args.get(\"cmd\", \"echo hello\")\n",
+      "attack_pattern": "; rm -rf / --",
+      "security_patch": "더 안전한 버전의 코드는 아래와 같이 수정되었습니다.\n\n    import subprocess\n    import shlex\n    cmd = request.args.get(\"cmd\", \"echo hello\")\n    cmd = shlex.split(cmd)\n    subprocess.run(cmd, shell=False)"
+    },
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 103,
+        "end": 103
+      },
+      "code": "    url = request.args.get(\"url\", \"http://example.com\")\n",
+      "attack_pattern": "http://malicious.com",
+      "security_patch": "from urllib.parse import urlparse\n\nuser_url = request.args.get(\"url\", \"http://example.com\")\nscheme, netloc, path, params, query, fragment = urlparse(user_url)\nif scheme not in ['http', 'https'] or netloc == '':\n    user_url = \"http://example.com\"\nurl = user_url"
+    },
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 111,
+        "end": 111
+      },
+      "code": "    next_url = request.args.get(\"next\", \"/\")\n",
+      "attack_pattern": "next=https://malicious-url.com",
+      "security_patch": "원본 코드에서는 사용자가 URL 파라미터 'next'를 통해 접근할 수 있는 URL을 제어할 수 있습니다. 이는 공격자가 불법적인 리디렉트를 통해 사용자를 피싱 사이트 등으로 이동시킬 수 있어 취약점으로 볼 수 있습니다.\n\n아래의 방법은 URL을 안전하게 만드는 방법입니다.\n\n```python\nfrom urllib.parse import urlparse, urljoin\nfrom flask import request, redirect, url_for\n\ndef is_safe_url(target):\n    # 현재 웹 어플리케이션과 URL을 비교하여 안전한지 확인.\n    ref_url = urlparse(request.host_url)\n    test_url = urlparse(urljoin(request.host_url, target))\n    return test_url.scheme in ('http', 'https') and \\\n           ref_url.netloc == test_url.netloc\n\nnext_url = request.args.get(\"next\", \"/\")\nif not is_safe_url(next_url):\n    # 만약 안전하지 않는 URL이라면, 홈페이지로 리다이렉트 한다.\n    return redirect(url_for('homepage'))\n```"
+    },
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 200,
+        "end": 200
+      },
+      "code": "    code = request.args.get(\"code\", \"1+1\")\n",
+      "attack_pattern": "\"; import os; os.system('rm -rf /') #\"",
+      "security_patch": "from flask import request\nfrom werkzeug.datastructures import MultiDict\n\ndef safe_eval(code):\n    blacklist = ['exec', 'eval', 'compile', '__import__', 'open', 'globals', 'locals', '__name__', '__file__', '__builtins__']\n    for keyword in blacklist:\n        if keyword in code:\n            return \"Error: forbidden keyword\"\n    return eval(code)\n\n@app.route('/', methods=['GET'])\ndef home():\n    safe_code = safe_eval(request.args.get(\"code\", \"1+1\"))\n    return 'Safe code: {}'.format(safe_code)"
+    },
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 218,
+        "end": 218
+      },
+      "code": "    user = request.args.get(\"v\", \"\")\n",
+      "attack_pattern": "\"><script>alert('XSS')</script>",
+      "security_patch": "user = cgi.escape(request.args.get(\"v\", \"\"))"
+    },
+    {
+      "check_id": "default_rule",
+      "path": "error_code.py",
+      "location": {
+        "start": 238,
+        "end": 238
+      },
+      "code": "    path = request.args.get(\"path\", \"insecure_app.py\")\n",
+      "attack_pattern": "../../etc/passwd",
+      "security_patch": "from flask import send_from_directory, request\nimport os\n\n@app.route('/getfile', methods=['GET'])\ndef getfile():\n    # 인코딩된 파일 경로를 가져온다.\n    path = request.args.get(\"path\", \"insecure_app.py\")\n\n    # 파일에 접근하기 전에 입력을 체크한다. \n    # os.path.abspath를 사용하여 절대 경로를 얻는다.\n    # 이것은 디렉터리 탐색 공격(directory traversal attack)을 방지한다\n    path = os.path.abspath(path)\n    if not path.startswith(os.getcwd()):\n        abort(403)\n    \n    # 파일 내용을 반환한다.\n    with open(path, 'r') as file:\n        return file.read()"
+    }
+  ]
+}

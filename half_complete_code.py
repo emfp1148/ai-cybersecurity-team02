@@ -8,6 +8,9 @@ import chardet
 from typing import List, Dict, Set, Tuple
 
 openai.api_key = "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"
+
+TARGET_CODE_PATH = ""
+
 if not openai.api_key:
     raise RuntimeError("환경변수 OPENAI_API_KEY가 설정되지 않았습니다. 먼저 설정해주세요.")
 
@@ -338,8 +341,13 @@ rules:
         return filepath
 
 def main():
-    print("※ 검사 대상 경로는 루트 기준 상대경로(예: ./a) 형태로 입력하세요.")
-    target_code_path = input("검사할 코드 경로를 입력하세요 (예: ./a): ").strip()
+    global TARGET_CODE_PATH
+
+    if len(sys.argv) >= 2:
+        target_code_path = sys.argv[1]
+    else:
+        print("※ 검사 대상 경로는 루트 기준 상대경로(예: ./a) 형태로 입력하세요.")
+        target_code_path = input("검사할 코드 경로를 입력하세요 (예: ./a): ").strip()
 
     # 1. 기존 스캔 실행
     print("\n[1/4] 기본 보안 규칙으로 스캔 중...")

@@ -1,0 +1,64 @@
+{
+  "initial_findings": [
+    {
+      "check_id": "python.django.security.injection.request-data-write.request-data-write",
+      "path": "data/unpacked/4fb87611eb20/vulnerable_web_project/app.py",
+      "location": {
+        "start": 8,
+        "end": 14
+      },
+      "code": "@app.route('/semgrep', methods=['POST'])\ndef run_semgrep():\n    code = request.json.get('code', '')\n    if not code:\n        return jsonify({'error': 'No code provided'}), 400\n\n주석:     # 임시 파일에 코드를 저장\n    with open('temp_code.py', 'w') as f:\n        f.write(code)\n\n주석:     # semgrep 실행 (예: 기본 python 규칙, json 출력)",
+      "comments": "    # 임시 파일에 코드를 저장\n    # semgrep 실행 (예: 기본 python 규칙, json 출력)",
+      "attack_pattern": "취약점에 대 한 공격구문: \"; import os; os.system('rm -rf /') #",
+      "security_patch": "@app.route('/semgrep', methods=['POST'])\ndef run_semgrep():\n    code = request.json.get('code', '')\n\n    if not code:\n        return jsonify({'error': 'No code provided'}), 400\n\n    # 코드를 통해 일반적인 운영 체제 명령 주입 취약점을 방지하기 위해,\n    # 코드를 직접 파일로 쓰지 않고, 문자열이 파일처럼 동작하게 하는 StringIO를 사용한다.\n    # 이렇게 하면 외부에서 공격자가 임의의 코드를 삽입하는 것을 방지할 수 있다.\n    file_obj = StringIO()\n    file_obj.write(code)\n\n    # 파일 객체를 seek(0)으로 재설정하여 파일의 시작 위치로 되돌린다.\n    # 이렇게 하면 파일을 처음부터 읽을 수 있다.\n    file_obj.seek(0)\n\n    # semgrep을 안전하게 실행한다. subprocess.run을 이용하여 실행하고, shell=True 옵션을 삭제하여\n    # shell 삽입을 막는다. 또한 input 파라미터로 file_obj를 전달하여 actual file 대신에 디스크에 쓰지 않고 사용한다.\n    result = subprocess.run(['semgrep', '--config=p/python', '-o=json', '-'], input=file_obj.getvalue(), capture_output=True, text=True)\n\n    return result.stdout"
+    },
+    {
+      "check_id": "python.flask.security.audit.debug-enabled.debug-enabled",
+      "path": "data/unpacked/4fb87611eb20/vulnerable_web_project/app.py",
+      "location": {
+        "start": 27,
+        "end": 27
+      },
+      "code": "\nif __name__ == '__main__':\n    app.run(debug=True)",
+      "comments": "",
+      "attack_pattern": "출력할 공격 구문 및 테스트 데이터는 없습니다. \n\n해당 코드 조각은 어플리케이션을 디버그 모드로 실행하는 파이썬 플라스크 코드입니다. 디버그 모드는 개발 과정에서만 사용할 것을 권장하며, 생산 환경에서는 권장하지 않습니다.\n\n하지만 이에 직접적으로 공격을 가하는 구문 또는 데이터는 없습니다. 공격자가 이를 이용하여 피해를 입히려면, 애플리케이션에 이미 존재하는 다른 취약점을 이용하거나 또는 제3자가 애플리케이션 코드나 상황을 악용해야하며, 그 스트링 또는 페이로드를 특정할 수 없습니다.",
+      "security_patch": "if __name__ == '__main__':\n    app.run(debug=False)"
+    }
+  ],
+  "new_rules": {
+    "rules": [
+      {
+        "id": "python.django.security.injection.request-data-write.request-data-write",
+        "pattern": "with open(..., 'w') as ...:\n    ....write(request.json.get(...))\n",
+        "message": "코드 인젝션 취약점: 사용자 입력을 직접 파일에 저장하고 있습니다. 사용자 입력을 검증하거나 적절히 이스케이프 처리하세요.",
+        "languages": [
+          "python"
+        ],
+        "severity": "ERROR"
+      },
+      {
+        "id": "python.flask.security.audit.debug-enabled.debug-enabled",
+        "pattern": "app.run(debug=True)",
+        "message": "디버그 모드 취약점: 애플리케이션을 디버그 모드로 실행하고 있습니다. 개발 환경외에는 디버그 모드를 사용하지 않는 것을 권장합니다.",
+        "languages": [
+          "python"
+        ],
+        "severity": "WARNING"
+      }
+    ]
+  },
+  "additional_findings": [
+    {
+      "check_id": "new_rules.python.flask.security.audit.debug-enabled.debug-enabled",
+      "path": "data/unpacked/4fb87611eb20/vulnerable_web_project/app.py",
+      "location": {
+        "start": 27,
+        "end": 27
+      },
+      "code": "\nif __name__ == '__main__':\n    app.run(debug=True)",
+      "comments": "",
+      "attack_pattern": "-",
+      "security_patch": "if __name__ == '__main__':\n    app.run(debug=False)"
+    }
+  ]
+}

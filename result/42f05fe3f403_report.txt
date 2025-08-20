@@ -1,0 +1,85 @@
+
+[1/4] 기본 보안 규칙으로 스캔 중...
+Semgrep 스캔을 시작합니다: 대상 경로='data/unpacked/42f05fe3f403'
+LLM 분석 중... 취약점 ID: python.django.security.injection.request-data-write.request-data-write
+LLM 분석 중... 취약점 ID: python.flask.security.audit.debug-enabled.debug-enabled
+
+탐지된 주석 목록:
+[python.django.security.injection.request-data-write.request-data-write] data/unpacked/42f05fe3f403/vulnerable_web_project/app.py (Line 8)
+    # 임시 파일에 코드를 저장
+    # semgrep 실행 (예: 기본 python 규칙, json 출력)
+
+
+[2/4] 추가 보안 규칙 생성 중...
+새로운 규칙이 'new_rules/new_rules_42f05fe3f403.yaml'에 저장되었습니다.
+
+[3/4] 새로운 규칙으로 추가 스캔 중...
+Semgrep 스캔을 시작합니다: 대상 경로='data/unpacked/42f05fe3f403'
+
+[4/4] 최종 보고서 생성 중...
+
+전체 보고서가 'security_report/security_report_42f05fe3f403.json'에 저장되었습니다.
+
+=== 분석 결과 요약 ===
+- 최초 발견된 취약점 수: 2
+- 추가 발견된 취약점 수: 0
+- 전체 보고서: security_report/security_report_42f05fe3f403.json
+- 생성된 규칙: new_rules/new_rules_42f05fe3f403.yaml
+
+=== 상세 분석 결과 ===
+
+--- 취약점 #1 ---
+룰 ID: python.django.security.injection.request-data-write.request-data-write
+파일 경로: data/unpacked/42f05fe3f403/vulnerable_web_project/app.py
+취약 코드 위치: 8 line부터 14 line까지
+
+=== 취약 코드 스니펫 ===
+@app.route('/semgrep', methods=['POST'])
+def run_semgrep():
+    code = request.json.get('code', '')
+    if not code:
+        return jsonify({'error': 'No code provided'}), 400
+
+주석:     # 임시 파일에 코드를 저장
+    with open('temp_code.py', 'w') as f:
+        f.write(code)
+
+주석:     # semgrep 실행 (예: 기본 python 규칙, json 출력)
+
+=== 공격 패턴 분석 ===
+-; os.system('rm -rf /')
+
+=== 보안 패치 권고 ===
+@app.route('/semgrep', methods=['POST'])
+def run_semgrep():
+    code = request.json.get('code', '')
+    if not code:
+        return jsonify({'error': 'No code provided'}), 400
+
+    import tempfile
+    import subprocess
+    with tempfile.NamedTemporaryFile(suffix=".py") as temp:
+        temp.write(code.encode())
+        temp.flush()
+        
+        result = subprocess.run(['semgrep', '--config=https://semgrep.dev/p/python', '--json', temp.name], text=True, capture_output=True)
+        return jsonify(result.stdout)
+================================================================================
+
+--- 취약점 #2 ---
+룰 ID: python.flask.security.audit.debug-enabled.debug-enabled
+파일 경로: data/unpacked/42f05fe3f403/vulnerable_web_project/app.py
+취약 코드 위치: 27 line부터 27 line까지
+
+=== 취약 코드 스니펫 ===
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+=== 공격 패턴 분석 ===
+-
+
+=== 보안 패치 권고 ===
+if __name__ == '__main__':
+    app.run(debug=False)
+================================================================================

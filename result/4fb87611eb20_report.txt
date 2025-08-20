@@ -1,0 +1,118 @@
+
+[1/4] 기본 보안 규칙으로 스캔 중...
+Semgrep 스캔을 시작합니다: 대상 경로='data/unpacked/4fb87611eb20'
+LLM 분석 중... 취약점 ID: python.django.security.injection.request-data-write.request-data-write
+LLM 분석 중... 취약점 ID: python.flask.security.audit.debug-enabled.debug-enabled
+
+탐지된 주석 목록:
+[python.django.security.injection.request-data-write.request-data-write] data/unpacked/4fb87611eb20/vulnerable_web_project/app.py (Line 8)
+    # 임시 파일에 코드를 저장
+    # semgrep 실행 (예: 기본 python 규칙, json 출력)
+
+
+[2/4] 추가 보안 규칙 생성 중...
+디렉토리 생성됨: new_rules
+새로운 규칙이 'new_rules/new_rules_4fb87611eb20.yaml'에 저장되었습니다.
+
+[3/4] 새로운 규칙으로 추가 스캔 중...
+Semgrep 스캔을 시작합니다: 대상 경로='data/unpacked/4fb87611eb20'
+LLM 분석 중... 취약점 ID: new_rules.python.flask.security.audit.debug-enabled.debug-enabled
+
+[4/4] 최종 보고서 생성 중...
+디렉토리 생성됨: security_report
+
+전체 보고서가 'security_report/security_report_4fb87611eb20.json'에 저장되었습니다.
+
+=== 분석 결과 요약 ===
+- 최초 발견된 취약점 수: 2
+- 추가 발견된 취약점 수: 1
+- 전체 보고서: security_report/security_report_4fb87611eb20.json
+- 생성된 규칙: new_rules/new_rules_4fb87611eb20.yaml
+
+=== 상세 분석 결과 ===
+
+--- 취약점 #1 ---
+룰 ID: python.django.security.injection.request-data-write.request-data-write
+파일 경로: data/unpacked/4fb87611eb20/vulnerable_web_project/app.py
+취약 코드 위치: 8 line부터 14 line까지
+
+=== 취약 코드 스니펫 ===
+@app.route('/semgrep', methods=['POST'])
+def run_semgrep():
+    code = request.json.get('code', '')
+    if not code:
+        return jsonify({'error': 'No code provided'}), 400
+
+주석:     # 임시 파일에 코드를 저장
+    with open('temp_code.py', 'w') as f:
+        f.write(code)
+
+주석:     # semgrep 실행 (예: 기본 python 규칙, json 출력)
+
+=== 공격 패턴 분석 ===
+취약점에 대 한 공격구문: "; import os; os.system('rm -rf /') #
+
+=== 보안 패치 권고 ===
+@app.route('/semgrep', methods=['POST'])
+def run_semgrep():
+    code = request.json.get('code', '')
+
+    if not code:
+        return jsonify({'error': 'No code provided'}), 400
+
+    # 코드를 통해 일반적인 운영 체제 명령 주입 취약점을 방지하기 위해,
+    # 코드를 직접 파일로 쓰지 않고, 문자열이 파일처럼 동작하게 하는 StringIO를 사용한다.
+    # 이렇게 하면 외부에서 공격자가 임의의 코드를 삽입하는 것을 방지할 수 있다.
+    file_obj = StringIO()
+    file_obj.write(code)
+
+    # 파일 객체를 seek(0)으로 재설정하여 파일의 시작 위치로 되돌린다.
+    # 이렇게 하면 파일을 처음부터 읽을 수 있다.
+    file_obj.seek(0)
+
+    # semgrep을 안전하게 실행한다. subprocess.run을 이용하여 실행하고, shell=True 옵션을 삭제하여
+    # shell 삽입을 막는다. 또한 input 파라미터로 file_obj를 전달하여 actual file 대신에 디스크에 쓰지 않고 사용한다.
+    result = subprocess.run(['semgrep', '--config=p/python', '-o=json', '-'], input=file_obj.getvalue(), capture_output=True, text=True)
+
+    return result.stdout
+================================================================================
+
+--- 취약점 #2 ---
+룰 ID: python.flask.security.audit.debug-enabled.debug-enabled
+파일 경로: data/unpacked/4fb87611eb20/vulnerable_web_project/app.py
+취약 코드 위치: 27 line부터 27 line까지
+
+=== 취약 코드 스니펫 ===
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+=== 공격 패턴 분석 ===
+출력할 공격 구문 및 테스트 데이터는 없습니다. 
+
+해당 코드 조각은 어플리케이션을 디버그 모드로 실행하는 파이썬 플라스크 코드입니다. 디버그 모드는 개발 과정에서만 사용할 것을 권장하며, 생산 환경에서는 권장하지 않습니다.
+
+하지만 이에 직접적으로 공격을 가하는 구문 또는 데이터는 없습니다. 공격자가 이를 이용하여 피해를 입히려면, 애플리케이션에 이미 존재하는 다른 취약점을 이용하거나 또는 제3자가 애플리케이션 코드나 상황을 악용해야하며, 그 스트링 또는 페이로드를 특정할 수 없습니다.
+
+=== 보안 패치 권고 ===
+if __name__ == '__main__':
+    app.run(debug=False)
+================================================================================
+
+--- 취약점 #3 ---
+룰 ID: new_rules.python.flask.security.audit.debug-enabled.debug-enabled
+파일 경로: data/unpacked/4fb87611eb20/vulnerable_web_project/app.py
+취약 코드 위치: 27 line부터 27 line까지
+
+=== 취약 코드 스니펫 ===
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+=== 공격 패턴 분석 ===
+-
+
+=== 보안 패치 권고 ===
+if __name__ == '__main__':
+    app.run(debug=False)
+================================================================================

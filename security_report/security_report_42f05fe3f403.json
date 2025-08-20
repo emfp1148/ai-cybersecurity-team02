@@ -1,0 +1,44 @@
+{
+  "initial_findings": [
+    {
+      "check_id": "python.django.security.injection.request-data-write.request-data-write",
+      "path": "data/unpacked/42f05fe3f403/vulnerable_web_project/app.py",
+      "location": {
+        "start": 8,
+        "end": 14
+      },
+      "code": "@app.route('/semgrep', methods=['POST'])\ndef run_semgrep():\n    code = request.json.get('code', '')\n    if not code:\n        return jsonify({'error': 'No code provided'}), 400\n\n주석:     # 임시 파일에 코드를 저장\n    with open('temp_code.py', 'w') as f:\n        f.write(code)\n\n주석:     # semgrep 실행 (예: 기본 python 규칙, json 출력)",
+      "comments": "    # 임시 파일에 코드를 저장\n    # semgrep 실행 (예: 기본 python 규칙, json 출력)",
+      "attack_pattern": "-; os.system('rm -rf /')",
+      "security_patch": "@app.route('/semgrep', methods=['POST'])\ndef run_semgrep():\n    code = request.json.get('code', '')\n    if not code:\n        return jsonify({'error': 'No code provided'}), 400\n\n    import tempfile\n    import subprocess\n    with tempfile.NamedTemporaryFile(suffix=\".py\") as temp:\n        temp.write(code.encode())\n        temp.flush()\n        \n        result = subprocess.run(['semgrep', '--config=https://semgrep.dev/p/python', '--json', temp.name], text=True, capture_output=True)\n        return jsonify(result.stdout)"
+    },
+    {
+      "check_id": "python.flask.security.audit.debug-enabled.debug-enabled",
+      "path": "data/unpacked/42f05fe3f403/vulnerable_web_project/app.py",
+      "location": {
+        "start": 27,
+        "end": 27
+      },
+      "code": "\nif __name__ == '__main__':\n    app.run(debug=True)",
+      "comments": "",
+      "attack_pattern": "-",
+      "security_patch": "if __name__ == '__main__':\n    app.run(debug=False)"
+    }
+  ],
+  "new_rules": {
+    "규칙 1": null,
+    "rules": [
+      {
+        "id": "python_flask_security_audit_debug-enabled_debug-enabled",
+        "pattern": "app.run(debug=True)",
+        "message": "디버그 모드 취약점: Flask 앱이 디버그 모드에서 실행되는 것은 보안 위험을 초래합니다.",
+        "languages": [
+          "python"
+        ],
+        "severity": "ERROR"
+      }
+    ],
+    "규칙 2": null
+  },
+  "additional_findings": []
+}

@@ -86,7 +86,9 @@ pip install fastapi uvicorn python-multipart jinja2 aiofiles
 ```
 
 ### 4. 환경 변수 등록
+```bash
 echo 'export OPENAI_API_KEY="...your_key..."' >> ~/.bashrc
+```
 
 ### 5. 서버 실행
 ```bash

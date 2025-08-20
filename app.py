@@ -23,7 +23,7 @@ UNPACKED_DIR = DATA_DIR / "unpacked"
 RESULT_DIR = BASE_DIR / "result"
 SECURITY_JSON_DIR = BASE_DIR / "security_report"   # half_complete_code.py 출력
 PYTHON_BIN = "python3"
-ANALYZER_SCRIPT = "half_complete_code.py"
+ANALYZER_SCRIPT = "alpha_vat.py"
 # =================================
 
 # 디렉토리 준비
